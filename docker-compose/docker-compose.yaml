@@ -33,7 +33,7 @@ services:
       - jenkins
 
   postgres:
-    image: postgres:15
+    image: postgres:17.2
     container_name: postgres
     environment:
       POSTGRES_USER: ${SONARQUBE_DB_USER:-sonarqube}
