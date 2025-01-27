@@ -1,0 +1,123 @@
+- name: Add Jenkins repo key
+  ansible.builtin.get_url:
+    url: https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key
+    dest: /usr/share/keyrings/jenkins-keyring.asc
+
+- name: Add Jenkins repository
+  ansible.builtin.apt_repository:
+    repo: deb [signed-by=/usr/share/keyrings/jenkins-keyring.asc] https://pkg.jenkins.io/debian-stable binary/
+    state: present
+    filename: jenkins.list
+
+- name: Update packages
+  ansible.builtin.apt:
+    name: "*"
+    state: latest
+
+- name: Install fontconfig
+  ansible.builtin.apt:
+    name: fontconfig
+    state: present
+
+- name: Install Jenkins
+  ansible.builtin.apt:
+    name: jenkins
+    state: latest
+    update_cache: yes
+
+- name: Ensure Jenkins is running
+  ansible.builtin.systemd:
+    name: jenkins
+    state: started
+    enabled: yes
+
+- name: Configure Jenkins to use S3 for storage
+  ansible.builtin.lineinfile:
+    path: /etc/default/jenkins
+    regexp: '^JENKINS_HOME='
+    line: 'JENKINS_HOME=/var/lib/jenkins'
+
+- name: Create Jenkins home directory
+  ansible.builtin.file:
+    path: /var/lib/jenkins
+    state: directory
+    owner: jenkins
+    group: jenkins
+    mode: '0755'
+
+- name: Download AWS CLI version 2
+  ansible.builtin.get_url:
+    url: "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip"
+    dest: "/tmp/awscliv2.zip"
+
+- name: Unzip AWS CLI installer
+  ansible.builtin.unarchive:
+    src: "/tmp/awscliv2.zip"
+    dest: "/tmp/"
+    remote_src: yes
+
+- name: Ensure AWS CLI is installed
+  ansible.builtin.shell: |
+    if ! command -v aws &> /dev/null; then
+      echo "AWS CLI not found. Installing..."
+      curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+      unzip awscliv2.zip
+      sudo ./aws/install
+    else
+      echo "AWS CLI is already installed. Updating..."
+      sudo ./aws/install --update
+    fi
+  args:
+    creates: /usr/local/aws-cli/v2/current
+
+
+- name: Verify AWS CLI installation
+  ansible.builtin.command:
+    cmd: "aws --version"
+  register: aws_cli_version
+
+- name: Ensure .aws directory exists for Jenkins
+  ansible.builtin.file:
+    path: /var/lib/jenkins/.aws
+    state: directory
+    owner: jenkins
+    group: jenkins
+    mode: '0700'
+
+- name: Configure AWS credentials for Jenkins
+  ansible.builtin.copy:
+    dest: /var/lib/jenkins/.aws/credentials
+    content: |
+      [default]
+      aws_access_key_id = {{ aws_access_key_id }}
+      aws_secret_access_key = {{ aws_secret_access_key }}
+
+- name: Ensure Jenkins has access to S3
+  command: aws s3api put-bucket-acl --bucket {{ s3_bucket_name }} --acl public-read
+  args:
+    creates: /var/lib/jenkins/.aws/credentials
+
+- name: Download Trivy package
+  ansible.builtin.get_url:
+     url: https://github.com/aquasecurity/trivy/releases/download/v0.18.3/trivy_0.18.3_Linux-64bit.deb
+     dest: /tmp/trivy_0.18.3_Linux-64bit.deb
+- name: Install Trivy using dpkg
+  ansible.builtin.apt:
+     deb: /tmp/trivy_0.18.3_Linux-64bit.deb
+
+- name: Install prerequisite packages for Docker
+  ansible.builtin.apt:
+     name:
+       - ca-certificates
+       - curl
+       - gnupg
+       - lsb-release
+     state: present
+- name: Install Docker
+  ansible.builtin.apt:
+     name: docker.io
+     state: present
+- name: Set permissions on Docker socket
+  ansible.builtin.file:
+     path: /var/run/docker.sock
+     mode: '0777'

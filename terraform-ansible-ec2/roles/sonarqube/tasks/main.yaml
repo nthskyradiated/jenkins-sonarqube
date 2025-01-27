@@ -1,0 +1,57 @@
+---
+- name: Create SonarQube user
+  ansible.builtin.user:
+    name: sonar
+    shell: /bin/bash
+    create_home: yes
+
+- name: Download SonarQube
+  ansible.builtin.get_url:
+    url: https://binaries.sonarsource.com/Distribution/sonarqube/sonarqube-25.1.0.102122.zip
+    dest: /tmp/sonarqube.zip
+
+- name: Unzip SonarQube
+  ansible.builtin.unarchive:
+    src: /tmp/sonarqube.zip
+    dest: /opt/
+    remote_src: yes
+  notify: Restart SonarQube service
+
+- name: Change ownership of SonarQube directory
+  ansible.builtin.file:
+    path: /opt/sonarqube-25.1.0.102122
+    owner: sonar
+    group: sonar
+    recurse: yes
+    state: directory
+
+- name: Create SonarQube service file
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/sonarqube.service
+    content: |
+      [Unit]
+      Description=SonarQube service
+      After=network.target
+
+      [Service]
+      Type=simple
+      User=sonar
+      ExecStart=/opt/sonarqube-25.1.0.102122/bin/linux-x86-64/sonar.sh start
+      ExecStop=/opt/sonarqube-25.1.0.102122/bin/linux-x86-64/sonar.sh stop
+      Restart=on-failure
+
+      [Install]
+      WantedBy=multi-user.target
+
+- name: Start SonarQube service
+  ansible.builtin.systemd:
+    name: sonarqube
+    state: started
+    enabled: yes
+
+- name: Configure SonarQube to use S3 for storage
+  ansible.builtin.lineinfile:
+    path: /opt/sonarqube-25.1.0.102122/conf/sonar.properties
+    regexp: '^#sonar.artifactStorage.s3.bucket='
+    line: 'sonar.artifactStorage.s3.bucket={{ s3_bucket_name }}'
+  notify: Restart SonarQube service

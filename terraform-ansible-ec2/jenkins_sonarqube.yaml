@@ -1,0 +1,33 @@
+- hosts: all
+  become: yes
+  vars_files:
+    - vars/main.yaml
+  tasks:
+    - name: Update and upgrade system packages
+      apt:
+        update_cache: yes
+        upgrade: dist
+
+    - name: Install common dependencies
+      apt:
+        name: "{{ item }}"
+        state: present
+      with_items:
+        - git
+        - unzip
+        - curl
+        - openjdk-17-jre
+
+- hosts: sonarqube
+  become: yes
+  vars_files:
+    - vars/main.yaml
+  roles:
+    - sonarqube
+- hosts: jenkins
+  become: yes
+  vars_files:
+    - vars/main.yaml
+  roles:
+    - jenkins
+
