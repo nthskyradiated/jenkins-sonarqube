@@ -37,3 +37,20 @@ variable "iam_role_name" {
   type        = string
   default     = "jenkins-sonarqube-role"
 }
+
+variable "db_password" {
+  description = "The password for the RDS instance"
+  type        = string
+  sensitive   = true
+}
+variable "db_username" {
+  description = "The username for the RDS instance"
+  type        = string
+  sensitive   = true
+}
+
+variable "rds_instance_type" {
+  description = "The instance class for the RDS instance"
+  type        = string
+  default     = "db.t2.micro"
+}

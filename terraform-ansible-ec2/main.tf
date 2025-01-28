@@ -35,6 +35,29 @@ resource "aws_subnet" "terra-ansible-subnet" {
   }
 }
 
+resource "aws_subnet" "terra-ansible-subnet-2" {
+  vpc_id            = aws_vpc.terra-ansible-vpc.id
+  cidr_block        = "10.0.2.0/24"
+  availability_zone = "us-east-1b"
+
+  tags = {
+    Name = "terra-ansible-subnet-2"
+  }
+}
+
+
+# DB Subnet Group
+resource "aws_db_subnet_group" "sonarqube_db_subnet_group" {
+  name       = "sonarqube_db_subnet_group"
+  subnet_ids = [aws_subnet.terra-ansible-subnet.id, aws_subnet.terra-ansible-subnet-2.id]
+
+  tags = {
+    Name = "SonarQube DB Subnet Group"
+  }
+}
+
+
+
 resource "aws_route_table_association" "terra-ansible-rta" {
   subnet_id      = aws_subnet.terra-ansible-subnet.id
   route_table_id = aws_route_table.terra-ansible-rt.id
@@ -91,6 +114,26 @@ resource "aws_security_group" "sonarqube_sg" {
     from_port   = 9000
     to_port     = 9000
     protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+}
+
+resource "aws_security_group" "rds_sg" {
+  name        = "rds_sg"
+  description = "Allow access to RDS from SonarQube instance"
+  vpc_id      = aws_vpc.terra-ansible-vpc.id
+
+  ingress {
+    from_port   = 5432
+    to_port     = 5432
+    protocol    = "tcp"
+    security_groups = [aws_security_group.terra-ansible-sg.id]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
     cidr_blocks = ["0.0.0.0/0"]
   }
 }
@@ -192,6 +235,13 @@ resource "aws_instance" "sonarqube_instance" {
   associate_public_ip_address = true
   iam_instance_profile        = aws_iam_instance_profile.sonarqube_instance_profile.name
 
+  user_data = <<-EOF
+              #!/bin/bash
+              echo "SONARQUBE_JDBC_URL=jdbc:postgresql://${aws_db_instance.sonarqube_db.endpoint}/sonarqube" >> /etc/environment
+              echo "SONARQUBE_JDBC_USERNAME=${var.db_username}" >> /etc/environment
+              echo "SONARQUBE_JDBC_PASSWORD=${var.db_password}" >> /etc/environment
+              EOF
+
   tags = {
     Name = "SonarQubeInstance"
     Role = "SonarQube"
@@ -208,6 +258,23 @@ resource "aws_instance" "sonarqube_instance" {
     }
   }
 }
+
+resource "aws_db_instance" "sonarqube_db" {
+  identifier             = "sonarqube-db"
+  engine                 = "postgres"
+  engine_version         = "15.10"
+  instance_class         = var.rds_instance_type
+  allocated_storage      = 20
+  storage_type           = "gp2"
+  username               = var.db_username
+  password               = var.db_password
+  db_subnet_group_name   = aws_db_subnet_group.sonarqube_db_subnet_group.name
+  vpc_security_group_ids = [aws_security_group.rds_sg.id]
+  skip_final_snapshot    = true
+  publicly_accessible    = false # Ensure the database is not publicly accessible
+  multi_az =  false
+}
+
 
 # IAM policy for S3 access
 resource "aws_iam_policy" "s3_access_policy" {
@@ -298,6 +365,36 @@ resource "null_resource" "ansible_provision" {
     command = "ansible-playbook -i '${join(",", [aws_instance.jenkins_instance.public_ip, aws_instance.sonarqube_instance.public_ip])},' --private-key ${local.private_key_path} -u ubuntu jenkins_sonarqube.yaml"
   }
 }
+
+resource "null_resource" "update_ansible_vars" {
+  provisioner "local-exec" {
+    command = <<EOT
+# Check if sonarqube_jdbc_url is present, then update or add
+if grep -q "sonarqube_jdbc_url:" ./vars/main.yaml; then
+  sed -i 's|^sonarqube_jdbc_url:.*|sonarqube_jdbc_url: jdbc:postgresql://${aws_db_instance.sonarqube_db.endpoint}:5432/sonarqube|' ./vars/main.yaml
+else
+  echo "sonarqube_jdbc_url: jdbc:postgresql://${aws_db_instance.sonarqube_db.endpoint}:5432/sonarqube" >> ./vars/main.yaml
+fi
+
+# Check if sonarqube_jdbc_username is present, then update or add
+if grep -q "sonarqube_jdbc_username:" ./vars/main.yaml; then
+  sed -i 's|^sonarqube_jdbc_username:.*|sonarqube_jdbc_username: ${var.db_username}|' ./vars/main.yaml
+else
+  echo "sonarqube_jdbc_username: ${var.db_username}" >> ./vars/main.yaml
+fi
+
+# Check if sonarqube_jdbc_password is present, then update or add
+if grep -q "sonarqube_jdbc_password:" ./vars/main.yaml; then
+  sed -i 's|^sonarqube_jdbc_password:.*|sonarqube_jdbc_password: ${var.db_password}|' ./vars/main.yaml
+else
+  echo "sonarqube_jdbc_password: ${var.db_password}" >> ./vars/main.yaml
+fi
+EOT
+  }
+
+  depends_on = [aws_db_instance.sonarqube_db]
+}
+
 
 resource "null_resource" "write_inventory" {
   depends_on = [aws_instance.jenkins_instance, aws_instance.sonarqube_instance]

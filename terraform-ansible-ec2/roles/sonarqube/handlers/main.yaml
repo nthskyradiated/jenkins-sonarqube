@@ -1,5 +1,12 @@
+# code: language=ansible
 ---
 - name: Restart SonarQube service
   ansible.builtin.systemd:
     name: sonarqube
     state: restarted
+
+- name: Start sonar
+  ansible.builtin.service:
+    name: sonar
+    state: started
+    enabled: true

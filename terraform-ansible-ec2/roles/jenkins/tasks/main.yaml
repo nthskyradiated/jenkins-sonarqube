@@ -2,6 +2,7 @@
   ansible.builtin.get_url:
     url: https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key
     dest: /usr/share/keyrings/jenkins-keyring.asc
+    mode: '0755'
 
 - name: Add Jenkins repository
   ansible.builtin.apt_repository:
@@ -12,7 +13,7 @@
 - name: Update packages
   ansible.builtin.apt:
     name: "*"
-    state: latest
+    state: present
 
 - name: Install fontconfig
   ansible.builtin.apt:
@@ -22,14 +23,15 @@
 - name: Install Jenkins
   ansible.builtin.apt:
     name: jenkins
-    state: latest
-    update_cache: yes
+    state: present
+    update_cache: true
 
 - name: Ensure Jenkins is running
   ansible.builtin.systemd:
     name: jenkins
     state: started
-    enabled: yes
+    enabled: true
+
 
 - name: Configure Jenkins to use S3 for storage
   ansible.builtin.lineinfile:
@@ -49,12 +51,13 @@
   ansible.builtin.get_url:
     url: "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip"
     dest: "/tmp/awscliv2.zip"
+    mode: '0755'
 
 - name: Unzip AWS CLI installer
   ansible.builtin.unarchive:
     src: "/tmp/awscliv2.zip"
     dest: "/tmp/"
-    remote_src: yes
+    remote_src: true
 
 - name: Ensure AWS CLI is installed
   ansible.builtin.shell: |
@@ -71,10 +74,10 @@
     creates: /usr/local/aws-cli/v2/current
 
 
-- name: Verify AWS CLI installation
-  ansible.builtin.command:
-    cmd: "aws --version"
-  register: aws_cli_version
+# - name: Verify AWS CLI installation
+#   ansible.builtin.command:
+#     cmd: "aws --version"
+#   register: aws_cli_version
 
 - name: Ensure .aws directory exists for Jenkins
   ansible.builtin.file:
@@ -91,33 +94,110 @@
       [default]
       aws_access_key_id = {{ aws_access_key_id }}
       aws_secret_access_key = {{ aws_secret_access_key }}
+    mode: '0755'
 
 - name: Ensure Jenkins has access to S3
-  command: aws s3api put-bucket-acl --bucket {{ s3_bucket_name }} --acl public-read
+  ansible.builtin.command: aws s3api put-bucket-acl --bucket {{ s3_bucket_name }} --acl public-read
   args:
     creates: /var/lib/jenkins/.aws/credentials
 
+- name: Create mount point
+  ansible.builtin.file:
+    path: /mnt/s3
+    state: directory
+    owner: jenkins
+    group: jenkins
+    mode: '0755'
+
+- name: Check if /mnt/s3 exists
+  ansible.builtin.stat:
+    path: /mnt/s3
+  register: s3_mount_stat
+
+- name: Ensure /mnt/s3 is empty
+  ansible.builtin.command:
+    cmd: "rm -rf /mnt/s3/*"
+  when: s3_mount_stat.stat.exists and s3_mount_stat.stat.isdir
+
+- name: Mount S3 bucket
+  ansible.builtin.shell:
+    cmd: "s3fs {{ s3_bucket_name }} /mnt/s3 -o use_cache=/tmp -o nonempty -o passwd_file=/etc/passwd-s3fs"
+  register: s3fs_mount_result
+  retries: 3
+  delay: 5
+  until: s3fs_mount_result.rc == 0
+  failed_when: s3fs_mount_result.rc != 0
+
+- name: Debug S3 mount failure
+  ansible.builtin.debug:
+    msg: "S3 bucket mount failed. stderr: {{ s3fs_mount_result.stderr }}"
+  when: s3fs_mount_result.failed
+
+- name: Verify S3 mount
+  ansible.builtin.shell:
+    cmd: "mountpoint -q /mnt/s3"
+  register: mount_check
+  changed_when: false
+  failed_when: mount_check.rc != 0
+
+- name: Create required directory in S3 bucket
+  ansible.builtin.command:
+    cmd: "mkdir -p /mnt/s3/{{ app_name }}/data"
+  when: mount_check.rc == 0
+  args:
+    creates: "/mnt/s3/{{ app_name }}/data"
+
+- name: Make mount persistent
+  ansible.builtin.lineinfile:
+    path: /etc/fstab
+    line: "s3fs#{{ s3_bucket_name }} /mnt/s3 fuse _netdev,allow_other,use_cache=/tmp,passwd_file=/etc/passwd-s3fs 0 0"
+    state: present
+
+- name: Stop Jenkins service
+  ansible.builtin.systemd:
+    name: jenkins
+    state: stopped
+
+- name: Move existing Jenkins home to backup
+  ansible.builtin.command:
+    cmd: "mv /var/lib/jenkins /var/lib/jenkins.bak"
+    creates: /var/lib/jenkins.bak
+
+- name: Create symlink to S3
+  ansible.builtin.file:
+    src: /mnt/s3/jenkins
+    dest: /var/lib/jenkins
+    state: link
+
+- name: Start Jenkins service
+  ansible.builtin.systemd:
+    name: jenkins
+    state: started
+    enabled: true
+
 - name: Download Trivy package
   ansible.builtin.get_url:
-     url: https://github.com/aquasecurity/trivy/releases/download/v0.18.3/trivy_0.18.3_Linux-64bit.deb
-     dest: /tmp/trivy_0.18.3_Linux-64bit.deb
+    url: https://github.com/aquasecurity/trivy/releases/download/v0.18.3/trivy_0.18.3_Linux-64bit.deb
+    dest: /tmp/trivy_0.18.3_Linux-64bit.deb
+    mode: '0755'
+
 - name: Install Trivy using dpkg
   ansible.builtin.apt:
-     deb: /tmp/trivy_0.18.3_Linux-64bit.deb
+    deb: /tmp/trivy_0.18.3_Linux-64bit.deb
 
 - name: Install prerequisite packages for Docker
   ansible.builtin.apt:
-     name:
-       - ca-certificates
-       - curl
-       - gnupg
-       - lsb-release
-     state: present
+    name:
+      - ca-certificates
+      - curl
+      - gnupg
+      - lsb-release
+    state: present
 - name: Install Docker
   ansible.builtin.apt:
-     name: docker.io
-     state: present
+    name: docker.io
+    state: present
 - name: Set permissions on Docker socket
   ansible.builtin.file:
-     path: /var/run/docker.sock
-     mode: '0777'
+    path: /var/run/docker.sock
+    mode: '0777'

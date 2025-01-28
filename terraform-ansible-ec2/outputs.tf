@@ -17,3 +17,7 @@ output "instance_ids" {
 output "instance_public_ips" {
   value = [aws_instance.jenkins_instance.public_ip, aws_instance.sonarqube_instance.public_ip]
 }
+
+output "rds_endpoint" {
+  value = aws_db_instance.sonarqube_db.endpoint
+}
