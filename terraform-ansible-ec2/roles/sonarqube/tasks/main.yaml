@@ -9,7 +9,7 @@
   ansible.builtin.get_url:
     url: https://binaries.sonarsource.com/Distribution/sonarqube/sonarqube-25.1.0.102122.zip
     dest: /tmp/sonarqube.zip
-    mode: '0755'
+    mode: '0644'
 
 - name: Unzip SonarQube and rename directory
   ansible.builtin.unarchive:
@@ -26,10 +26,10 @@
     depth: 1
   register: sonarqube_folder
 
-- name: Check if /opt/sonarqube exists
-  ansible.builtin.stat:
-    path: /opt/sonarqube
-  register: sonarqube_dir
+# - name: Check if /opt/sonarqube exists
+#   ansible.builtin.stat:
+#     path: /opt/sonarqube
+#   register: sonarqube_dir
 
 - name: Backup or remove existing /opt/sonarqube directory
   ansible.builtin.shell: |
@@ -47,7 +47,7 @@
   when: sonarqube_folder.matched > 0
   changed_when: false
 
-- name: Change ownership of SonarQube directory
+- name: Set correct permissions on SonarQube directory
   ansible.builtin.file:
     path: /opt/sonarqube
     owner: sonar
@@ -64,8 +64,9 @@
     - "sonar.jdbc.url={{ sonarqube_jdbc_url }}"
     - "sonar.jdbc.username={{ sonarqube_jdbc_username }}"
     - "sonar.jdbc.password={{ sonarqube_jdbc_password }}"
+  notify: Restart SonarQube service
 
-- name: Create SonarQube service file
+- name: Create SonarQube systemd service
   ansible.builtin.copy:
     dest: /etc/systemd/system/sonarqube.service
     content: |
@@ -84,20 +85,20 @@
 
       [Install]
       WantedBy=multi-user.target
-    mode: '0755'
+    mode: '0644'
 
-- name: Stop SonarQube service
+- name: Stop SonarQube service before further configuration
   ansible.builtin.systemd:
     name: sonarqube
     state: stopped
     enabled: false
 
-- name: Backup existing SonarQube data directory
-  ansible.builtin.command:
-    cmd: "mv /opt/sonarqube/data /opt/sonarqube/data.bak"
-    creates: /opt/sonarqube/data.bak
+# - name: Backup existing SonarQube data directory
+#   ansible.builtin.command:
+#     cmd: "mv /opt/sonarqube/data /opt/sonarqube/data.bak"
+#     creates: /opt/sonarqube/data.bak
 
-- name: Create mount point
+- name: Create mount point for S3
   ansible.builtin.file:
     path: /mnt/s3
     state: directory
@@ -114,23 +115,25 @@
   ansible.builtin.command:
     cmd: "rm -rf /mnt/s3/*"
   when: s3_mount_stat.stat.exists and s3_mount_stat.stat.isdir
+  changed_when: false
 
 - name: Mount S3 bucket
-  ansible.builtin.shell:
+  ansible.builtin.command:
     cmd: "s3fs {{ s3_bucket_name }} /mnt/s3 -o use_cache=/tmp -o nonempty -o passwd_file=/etc/passwd-s3fs"
   register: s3fs_mount_result
   retries: 3
   delay: 5
   until: s3fs_mount_result.rc == 0
   failed_when: s3fs_mount_result.rc != 0
+  changed_when: s3fs_mount_result.rc == 0
 
-- name: Debug S3 mount failure
-  ansible.builtin.debug:
-    msg: "S3 bucket mount failed. stderr: {{ s3fs_mount_result.stderr }}"
-  when: s3fs_mount_result.failed
+# - name: Debug S3 mount failure
+#   ansible.builtin.debug:
+#     msg: "S3 bucket mount failed. stderr: {{ s3fs_mount_result.stderr }}"
+#   when: s3fs_mount_result.failed
 
 - name: Verify S3 mount
-  ansible.builtin.shell:
+  ansible.builtin.command:
     cmd: "mountpoint -q /mnt/s3"
   register: mount_check
   changed_when: false
@@ -143,16 +146,22 @@
   args:
     creates: "/mnt/s3/{{ app_name }}/data"
 
-- name: Ensure expected folder structure exists in S3 bucket
-  ansible.builtin.shell:
-    cmd: "mkdir -p /mnt/s3/sonarqube/data"
-  when: mount_check.rc == 0
-  changed_when: false
+# - name: Ensure expected folder structure exists in S3 bucket
+#   ansible.builtin.shell:
+#     cmd: "mkdir -p /mnt/s3/sonarqube/data"
+#   when: mount_check.rc == 0
+#   changed_when: false
+
+- name: Make mount persistent
+  ansible.builtin.lineinfile:
+    path: /etc/fstab
+    line: "s3fs#{{ s3_bucket_name }} /mnt/s3 fuse _netdev,allow_other,use_cache=/tmp,passwd_file=/etc/passwd-s3fs 0 0"
+    state: present
 
 - name: Create symlink to S3
   ansible.builtin.file:
     src: /mnt/s3/sonarqube/data
-    dest: /opt/sonarqube/data
+    dest: /home/sonar/data
     state: link
 
 - name: Start SonarQube service
@@ -161,9 +170,9 @@
     state: started
     enabled: true
 
-- name: Configure SonarQube to use S3 for storage
-  ansible.builtin.lineinfile:
-    path: /opt/sonarqube/conf/sonar.properties
-    regexp: '^#sonar.artifactStorage.s3.bucket='
-    line: 'sonar.artifactStorage.s3.bucket={{ s3_bucket_name }}'
-  notify: Restart SonarQube service
+# - name: Configure SonarQube to use S3 for storage
+#   ansible.builtin.lineinfile:
+#     path: /opt/sonarqube/conf/sonar.properties
+#     regexp: '^#sonar.artifactStorage.s3.bucket='
+#     line: 'sonar.artifactStorage.s3.bucket={{ s3_bucket_name }}'
+#   notify: Restart SonarQube service

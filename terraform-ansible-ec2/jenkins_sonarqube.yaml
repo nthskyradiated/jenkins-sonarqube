@@ -27,7 +27,6 @@
         group: root
         mode: '0600'
 
-
 - name: Configure SonarQube
   hosts: sonarqube
   become: true
