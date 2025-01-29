@@ -56,6 +56,11 @@
     state: directory
     mode: '0755'
 
+- name: Install psql-client
+  ansible.builtin.apt:
+    name: postgresql-client
+    state: present
+
 - name: Configure SonarQube to use PostgreSQL
   ansible.builtin.lineinfile:
     path: /opt/sonarqube/conf/sonar.properties
@@ -72,13 +77,15 @@
     content: |
       [Unit]
       Description=SonarQube service
-      After=network.target
+      After=syslog.target network.target
 
       [Service]
       Type=forking
       User=sonar
+      Group=sonar
       ExecStart=/opt/sonarqube/bin/linux-x86-64/sonar.sh start
       ExecStop=/opt/sonarqube/bin/linux-x86-64/sonar.sh stop
+      StandardOutput=journal
       LimitNOFILE=65536
       LimitNPROC=4096
       Restart=always

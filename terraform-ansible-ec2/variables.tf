@@ -48,6 +48,10 @@ variable "db_username" {
   type        = string
   sensitive   = true
 }
+variable "db_name" {
+  description = "The database name"
+  type        = string
+}
 
 variable "rds_instance_type" {
   description = "The instance class for the RDS instance"
