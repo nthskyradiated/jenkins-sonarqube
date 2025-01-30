@@ -237,7 +237,7 @@ resource "aws_instance" "sonarqube_instance" {
 
   user_data = <<-EOF
               #!/bin/bash
-              echo "SONARQUBE_JDBC_URL=jdbc:postgresql://${aws_db_instance.sonarqube_db.endpoint}/${aws_db_instance.sonarqube_db.name}" >> /etc/environment
+              echo "SONARQUBE_JDBC_URL=jdbc:postgresql://${aws_db_instance.sonarqube_db.endpoint}/${aws_db_instance.sonarqube_db.db_name}" >> /etc/environment
               echo "SONARQUBE_JDBC_USERNAME=${var.db_username}" >> /etc/environment
               echo "SONARQUBE_JDBC_PASSWORD=${var.db_password}" >> /etc/environment
               EOF
@@ -372,9 +372,9 @@ resource "null_resource" "update_ansible_vars" {
     command = <<EOT
 # Check if sonarqube_jdbc_url is present, then update or add
 if grep -q "sonarqube_jdbc_url:" ./vars/main.yaml; then
-  sed -i 's|^sonarqube_jdbc_url:.*|sonarqube_jdbc_url: jdbc:postgresql://${aws_db_instance.sonarqube_db.endpoint}/${aws_db_instance.sonarqube_db.name}|' ./vars/main.yaml
+  sed -i 's|^sonarqube_jdbc_url:.*|sonarqube_jdbc_url: jdbc:postgresql://${aws_db_instance.sonarqube_db.endpoint}/${aws_db_instance.sonarqube_db.db_name}|' ./vars/main.yaml
 else
-  echo "sonarqube_jdbc_url: jdbc:postgresql://${aws_db_instance.sonarqube_db.endpoint}/${aws_db_instance.sonarqube_db.name}" >> ./vars/main.yaml
+  echo "sonarqube_jdbc_url: jdbc:postgresql://${aws_db_instance.sonarqube_db.endpoint}/${aws_db_instance.sonarqube_db.db_name}" >> ./vars/main.yaml
 fi
 
 # Check if sonarqube_jdbc_username is present, then update or add
