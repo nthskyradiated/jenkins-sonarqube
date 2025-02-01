@@ -355,8 +355,8 @@ resource "null_resource" "ansible_provision" {
     aws_db_instance.sonarqube_db
   ]
 
-provisioner "local-exec" {
-  command = <<EOT
+  provisioner "local-exec" {
+    command = <<EOT
     yq -i '
       .unclassified.gitHubPluginConfig.hookUrl = "http://${aws_instance.jenkins_instance.public_ip}:8080/github-webhook/" |
       .unclassified.location.url = "http://${aws_instance.jenkins_instance.public_ip}:8080/" |
@@ -364,7 +364,7 @@ provisioner "local-exec" {
       .unclassified.sonarQualityGates.sonarInstances[0].url = "http://${aws_instance.sonarqube_instance.public_ip}:9000/"
     ' ./lib/jenkins.yaml
   EOT
-}
+  }
 
   provisioner "local-exec" {
     command = <<EOT
