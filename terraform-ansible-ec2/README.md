@@ -8,8 +8,7 @@ Ensure the following tools are installed on your system:
 - AWS CLI
 - Terraform
 - Ansible
-- JQ (to parse JSON)
-- YQ (to parse YAML)
+- YQ (to parse YAML. https://github.com/mikefarah/yq )
 
 ## Setup Instructions
 
@@ -47,6 +46,6 @@ Ensure the following tools are installed on your system:
 - **roles/sonarqube/tasks/main.yaml**: Ansible role for SonarQube.
 - **terraform.tfvars**
 - **variables.tf**: Defines variables used in the Terraform configuration.
-- **write_inventory.sh**: Script to capture public IPs of instances and write to the inventory file.
+- **write_inventory.sh**: Script to capture public IPs of instances and write to the inventory file. *replaced by null resource "ansible-provision"*
 - **vars/main.yaml**: Ansible var file.
 - **lib/jenkins.yaml**: Jenkins config file to be imported.

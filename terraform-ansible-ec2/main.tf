@@ -355,13 +355,16 @@ resource "null_resource" "ansible_provision" {
     aws_db_instance.sonarqube_db
   ]
 
-  provisioner "local-exec" {
-    command = <<EOT
-      yq -Y -i '.unclassified.gitHubPluginConfig.hookUrl = "http://${aws_instance.jenkins_instance.public_ip}:8080/github-webhook/"' ./lib/jenkins.yaml
-      yq -Y -i '.unclassified.location.url = "http://${aws_instance.jenkins_instance.public_ip}:8080/"' ./lib/jenkins.yaml
-      yq -Y -i '.unclassified.sonarGlobalConfiguration.installations[0].serverUrl = "http://${aws_instance.sonarqube_instance.public_ip}:9000"' ./lib/jenkins.yaml
-    EOT
-  }
+provisioner "local-exec" {
+  command = <<EOT
+    yq -i '
+      .unclassified.gitHubPluginConfig.hookUrl = "http://${aws_instance.jenkins_instance.public_ip}:8080/github-webhook/" |
+      .unclassified.location.url = "http://${aws_instance.jenkins_instance.public_ip}:8080/" |
+      .unclassified.sonarGlobalConfiguration.installations[0].serverUrl = "http://${aws_instance.sonarqube_instance.public_ip}:9000/" |
+      .unclassified.sonarQualityGates.sonarInstances[0].url = "http://${aws_instance.sonarqube_instance.public_ip}:9000/"
+    ' ./lib/jenkins.yaml
+  EOT
+}
 
   provisioner "local-exec" {
     command = <<EOT
@@ -377,42 +380,15 @@ resource "null_resource" "ansible_provision" {
 resource "null_resource" "update_ansible_vars" {
   provisioner "local-exec" {
     command = <<EOT
-      # Check if sonarqube_jdbc_url is present, then update or add
-      if grep -q "sonarqube_jdbc_url:" ./vars/main.yaml; then
-        sed -i 's|^sonarqube_jdbc_url:.*|sonarqube_jdbc_url: jdbc:postgresql://${aws_db_instance.sonarqube_db.endpoint}/${aws_db_instance.sonarqube_db.db_name}|' ./vars/main.yaml
-      else
-        echo "sonarqube_jdbc_url: jdbc:postgresql://${aws_db_instance.sonarqube_db.endpoint}/${aws_db_instance.sonarqube_db.db_name}" >> ./vars/main.yaml
-      fi
-
-      # Check if sonarqube_jdbc_username is present, then update or add
-      if grep -q "sonarqube_jdbc_username:" ./vars/main.yaml; then
-        sed -i 's|^sonarqube_jdbc_username:.*|sonarqube_jdbc_username: ${var.db_username}|' ./vars/main.yaml
-      else
-        echo "sonarqube_jdbc_username: ${var.db_username}" >> ./vars/main.yaml
-      fi
-
-      # Check if sonarqube_jdbc_password is present, then update or add
-      if grep -q "sonarqube_jdbc_password:" ./vars/main.yaml; then
-        sed -i 's|^sonarqube_jdbc_password:.*|sonarqube_jdbc_password: ${var.db_password}|' ./vars/main.yaml
-      else
-        echo "sonarqube_jdbc_password: ${var.db_password}" >> ./vars/main.yaml
-      fi
-
-      if grep -q "s3_bucket_name:" ./vars/main.yaml; then
-        sed -i 's|^s3_bucket_name:.*|s3_bucket_name: ${var.s3_bucket_name}|' ./vars/main.yaml
-      else
-        echo "s3_bucket_name: ${var.s3_bucket_name}" >> ./vars/main.yaml
-      fi
-      if grep -q "aws_access_key_id:" ./vars/main.yaml; then
-        sed -i 's|^aws_access_key_id:.*|aws_access_key_id: ${var.aws_access_key_id}|' ./vars/main.yaml
-      else
-        echo "aws_access_key_id: ${var.aws_access_key_id}" >> ./vars/main.yaml
-      fi
-      if grep -q "aws_secret_access_key:" ./vars/main.yaml; then
-        sed -i 's|^aws_secret_access_key:.*|aws_secret_access_key: ${var.aws_secret_access_key}|' ./vars/main.yaml
-      else
-        echo "aws_secret_access_key: ${var.aws_secret_access_key}" >> ./vars/main.yaml
-      fi
+      touch ./vars/main.yaml
+      yq -i '
+        .sonarqube_jdbc_url = "jdbc:postgresql://${aws_db_instance.sonarqube_db.endpoint}/${aws_db_instance.sonarqube_db.db_name}" |
+        .sonarqube_jdbc_username = "${var.db_username}" |
+        .sonarqube_jdbc_password = "${var.db_password}" |
+        .s3_bucket_name = "${var.s3_bucket_name}" |
+        .aws_access_key_id = "${var.aws_access_key_id}" |
+        .aws_secret_access_key = "${var.aws_secret_access_key}"
+      ' ./vars/main.yaml
     EOT
   }
 

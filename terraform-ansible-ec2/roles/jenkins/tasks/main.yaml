@@ -134,8 +134,8 @@
 
 - name: Copy jenkins.yaml to /var/lib/jenkins
   ansible.builtin.copy:
-    src: ./lib/jenkins.yaml  # Path on your local machine
-    dest: /mnt/s3/jenkins/backups-s3/jenkins.yaml  # Destination on EC2 instance
+    src: ./lib/jenkins.yaml
+    dest: /var/lib/jenkins/jenkins.yaml
     owner: jenkins
     group: jenkins
     mode: '0644'

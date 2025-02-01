@@ -1,3 +1,5 @@
+# this is of no use now. It is included only as reference to what I used to create the inventory file before.
+# replaced by the null resource block "ansible_provision" in the terraform code. 
 #!/bin/bash
 
 terraform refresh

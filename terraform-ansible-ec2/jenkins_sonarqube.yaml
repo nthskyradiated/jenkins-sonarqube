@@ -27,6 +27,16 @@
         group: root
         mode: '0600'
 
+- name: Configure Jenkins
+  hosts: jenkins
+  become: true
+  vars_files:
+    - vars/main.yaml
+  vars:
+    app_name: "jenkins"
+  roles:
+    - jenkins
+    
 - name: Configure SonarQube
   hosts: sonarqube
   become: true
@@ -37,12 +47,3 @@
   roles:
     - sonarqube
 
-- name: Configure Jenkins
-  hosts: jenkins
-  become: true
-  vars_files:
-    - vars/main.yaml
-  vars:
-    app_name: "jenkins"
-  roles:
-    - jenkins
