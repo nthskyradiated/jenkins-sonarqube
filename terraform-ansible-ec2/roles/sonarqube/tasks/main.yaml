@@ -26,11 +26,6 @@
     depth: 1
   register: sonarqube_folder
 
-# - name: Check if /opt/sonarqube exists
-#   ansible.builtin.stat:
-#     path: /opt/sonarqube
-#   register: sonarqube_dir
-
 - name: Backup or remove existing /opt/sonarqube directory
   ansible.builtin.shell: |
     if [ -d "/opt/sonarqube" ]; then
@@ -134,11 +129,6 @@
   failed_when: s3fs_mount_result.rc != 0
   changed_when: s3fs_mount_result.rc == 0
 
-# - name: Debug S3 mount failure
-#   ansible.builtin.debug:
-#     msg: "S3 bucket mount failed. stderr: {{ s3fs_mount_result.stderr }}"
-#   when: s3fs_mount_result.failed
-
 - name: Verify S3 mount
   ansible.builtin.command:
     cmd: "mountpoint -q /mnt/s3"
@@ -176,10 +166,3 @@
     name: sonarqube
     state: started
     enabled: true
-
-# - name: Configure SonarQube to use S3 for storage
-#   ansible.builtin.lineinfile:
-#     path: /opt/sonarqube/conf/sonar.properties
-#     regexp: '^#sonar.artifactStorage.s3.bucket='
-#     line: 'sonar.artifactStorage.s3.bucket={{ s3_bucket_name }}'
-#   notify: Restart SonarQube service

@@ -151,16 +151,6 @@ resource "aws_s3_bucket" "terra_ansible_bucket" {
   }
 }
 
-# resource "aws_s3_bucket_acl" "terra_ansible_bucket_acl" {
-#   bucket = aws_s3_bucket.terra_ansible_bucket.id
-#   acl    = "private"
-# }
-
-# resource "random_string" "bucket_suffix" {
-#   length  = 8
-#   special = false
-# }
-
 resource "aws_s3_bucket_public_access_block" "terra_ansible_bucket_block" {
   bucket = aws_s3_bucket.terra_ansible_bucket.id
 
@@ -272,12 +262,10 @@ resource "aws_db_instance" "sonarqube_db" {
   db_subnet_group_name   = aws_db_subnet_group.sonarqube_db_subnet_group.name
   vpc_security_group_ids = [aws_security_group.rds_sg.id]
   skip_final_snapshot    = true
-  publicly_accessible    = false # Ensure the database is not publicly accessible
+  publicly_accessible    = false
   multi_az               = false
 }
 
-
-# IAM policy for S3 access
 resource "aws_iam_policy" "s3_access_policy" {
   name        = "S3AccessPolicy"
   description = "Policy for Jenkins and SonarQube to access S3 bucket"
@@ -365,6 +353,15 @@ resource "null_resource" "ansible_provision" {
   provisioner "local-exec" {
     command = "ansible-playbook -i '${join(",", [aws_instance.jenkins_instance.public_ip, aws_instance.sonarqube_instance.public_ip])},' --private-key ${local.private_key_path} -u ubuntu jenkins_sonarqube.yaml"
   }
+
+provisioner "local-exec" {
+  command = <<EOT
+    yq -Y -i '.unclassified.gitHubPluginConfig.hookUrl = "http://${aws_instance.jenkins_instance.public_ip}:8080/github-webhook/"' ./lib/jenkins.yaml
+    yq -Y -i '.unclassified.location.url = "http://${aws_instance.jenkins_instance.public_ip}:8080/"' ./lib/jenkins.yaml
+    yq -Y -i '.unclassified.sonarGlobalConfiguration.installations[0].serverUrl = "http://${aws_instance.sonarqube_instance.public_ip}:9000"' ./lib/jenkins.yaml
+  EOT
+}
+
 }
 
 resource "null_resource" "update_ansible_vars" {
@@ -396,11 +393,10 @@ EOT
   depends_on = [aws_db_instance.sonarqube_db]
 }
 
-
 resource "null_resource" "write_inventory" {
   depends_on = [aws_instance.jenkins_instance, aws_instance.sonarqube_instance]
 
   provisioner "local-exec" {
-    command = "bash ./write_inventory.sh && ansible-playbook -i inventory --private-key ~/.ssh/ansible-key -u ubuntu jenkins_sonarqube.yaml"
+    command = "bash ./write_inventory.sh && ansible-playbook -i inventory --private-key ${local.private_key_path} -u ubuntu jenkins_sonarqube.yaml"
   }
 }

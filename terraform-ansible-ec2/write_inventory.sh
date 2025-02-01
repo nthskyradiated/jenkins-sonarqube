@@ -1,12 +1,11 @@
 #!/bin/bash
 
-# Ensure Terraform state is up to date
 terraform refresh
 
 # Wait for instances to be fully provisioned
-max_wait_time=180  # Maximum wait time in seconds
+max_wait_time=180
 wait_time=0
-check_interval=5   # Check every 5 seconds
+check_interval=5
 
 check_instances_running() {
   instance_ids=$(terraform output -json instance_ids | jq -r '.[]')
@@ -33,19 +32,17 @@ while ! check_instances_running; do
   wait_time=$((wait_time + check_interval))
 done
 
-# Output the instance IPs directly from Terraform output
 jenkins_ip=$(terraform output -json jenkins_instance_ip | jq -r '.')
 sonarqube_ip=$(terraform output -json sonarqube_instance_ip | jq -r '.')
 
-# Add Jenkins IP to inventory
+# Populate the inventory file
 echo "[jenkins]" > inventory
 echo "$jenkins_ip" >> inventory
 
-# Add SonarQube IP to inventory
 echo "[sonarqube]" >> inventory
 echo "$sonarqube_ip" >> inventory
 
-# Check if the output file is populated
+
 if [ -s inventory ]; then
   echo "Inventory file created successfully."
   echo '{"status": "completed"}'

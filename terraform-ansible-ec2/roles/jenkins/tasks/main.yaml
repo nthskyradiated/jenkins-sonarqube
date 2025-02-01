@@ -75,32 +75,6 @@
     group: jenkins
     mode: '0755'
 
-# - name: Configure Jenkins to use S3 for storage
-#   ansible.builtin.lineinfile:
-#     path: /etc/default/jenkins
-#     regexp: '^JENKINS_HOME='
-#     line: 'JENKINS_HOME=/var/lib/jenkins'
-
-# - name: Create Jenkins home directory
-#   ansible.builtin.file:
-#     path: /var/lib/jenkins
-#     state: directory
-#     owner: jenkins
-#     group: jenkins
-#     mode: '0755'
-
-# - name: Download AWS CLI version 2
-#   ansible.builtin.get_url:
-#     url: "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip"
-#     dest: "/tmp/awscliv2.zip"
-#     mode: '0755'
-
-# - name: Unzip AWS CLI installer
-#   ansible.builtin.unarchive:
-#     src: "/tmp/awscliv2.zip"
-#     dest: "/tmp/"
-#     remote_src: true
-
 - name: Ensure Jenkins has access to S3
   ansible.builtin.command: aws s3api put-bucket-acl --bucket {{ s3_bucket_name }} --acl public-read
   args:
@@ -146,11 +120,6 @@
     name: jenkins
     state: stopped
 
-# - name: Move existing Jenkins home to backup
-#   ansible.builtin.command:
-#     cmd: "mv /var/lib/jenkins /var/lib/jenkins.bak"
-#     creates: /var/lib/jenkins.bak
-
 - name: Make mount persistent
   ansible.builtin.lineinfile:
     path: /etc/fstab
@@ -162,6 +131,14 @@
     src: /mnt/s3/jenkins/backups-s3
     dest: /var/lib/jenkins/backups-s3
     state: link
+
+- name: Copy jenkins.yaml to /var/lib/jenkins
+  ansible.builtin.copy:
+    src: ./lib/jenkins.yaml  # Path on your local machine
+    dest: /mnt/s3/jenkins/backups-s3/jenkins.yaml  # Destination on EC2 instance
+    owner: jenkins
+    group: jenkins
+    mode: '0644'
 
 - name: Install Trivy security scanner
   ansible.builtin.get_url:

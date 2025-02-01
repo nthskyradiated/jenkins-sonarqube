@@ -1,7 +1,7 @@
 # Multiple EC2 Instances Deployment and Provisioning with Terraform & Ansible
 
 ## Overview
-This project automates the deployment of two EC2 instances on AWS, one running Jenkins and the other running SonarQube. Both instances are configured to use an S3 bucket for storage. Ansible is used for provisioning and configuration management.
+This project automates the deployment of two EC2 instances on AWS, one running Jenkins while the other running SonarQube, one RDS (Postgresql) instance. Both EC2 instances are configured to use an S3 bucket for storage. Ansible is used for provisioning and configuration management and Terraform for deployment.
 
 ## Requirements
 Ensure the following tools are installed on your system:
@@ -9,6 +9,7 @@ Ensure the following tools are installed on your system:
 - Terraform
 - Ansible
 - JQ (to parse JSON)
+- YQ (to parse YAML)
 
 ## Setup Instructions
 
@@ -39,18 +40,13 @@ Ensure the following tools are installed on your system:
 
 ## Project Structure
 - **ansible.cfg**: Configuration settings for Ansible.
-- **inventory**: Lists the IP addresses of the EC2 instances managed by Ansible.
+- **inventory**: Lists the IP addresses of the EC2 instances. Created on first run and updated on subsequent runs.
 - **main.tf**: Main Terraform configuration file defining AWS resources.
-- **outputs.tf**: Outputs of the Terraform configuration, including instance IPs.
-- **README.md**: Documentation for the project.
-- **roles/jenkins/tasks/main.yaml**: Ansible tasks for installing Jenkins.
-- **roles/sonarqube/tasks/main.yaml**: Ansible tasks for installing SonarQube.
-- **terraform.tfvars**: Variable definitions for Terraform.
+- **outputs.tf**
+- **roles/jenkins/tasks/main.yaml**: Ansible role for Jenkins.
+- **roles/sonarqube/tasks/main.yaml**: Ansible role for SonarQube.
+- **terraform.tfvars**
 - **variables.tf**: Defines variables used in the Terraform configuration.
 - **write_inventory.sh**: Script to capture public IPs of instances and write to the inventory file.
-
-## IAM Policies
-Ensure that the necessary IAM policies are created to allow the EC2 instances to access the S3 bucket for storage.
-
-## Tags
-All resources (EC2 instances and S3 bucket) should be tagged appropriately for better management and cost tracking.
+- **vars/main.yaml**: Ansible var file.
+- **lib/jenkins.yaml**: Jenkins config file to be imported.
