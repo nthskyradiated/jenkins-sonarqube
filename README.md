@@ -23,6 +23,7 @@ This approach uses Docker Compose to deploy Jenkins, SonarQube, and a PostgreSQL
 
 2. Start the services:
     ```sh
+    docker network create jenkins
     docker compose up -d
     ```
 
