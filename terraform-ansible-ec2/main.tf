@@ -348,55 +348,73 @@ resource "aws_iam_instance_profile" "sonarqube_instance_profile" {
 
 # Null resource to trigger ansible-playbook run after instance creation
 resource "null_resource" "ansible_provision" {
-  depends_on = [aws_instance.jenkins_instance, aws_instance.sonarqube_instance]
+  depends_on = [
+    aws_instance.jenkins_instance,
+    aws_instance.sonarqube_instance,
+    null_resource.update_ansible_vars,
+    aws_db_instance.sonarqube_db
+  ]
 
   provisioner "local-exec" {
-    command = "ansible-playbook -i '${join(",", [aws_instance.jenkins_instance.public_ip, aws_instance.sonarqube_instance.public_ip])},' --private-key ${local.private_key_path} -u ubuntu jenkins_sonarqube.yaml"
+    command = <<EOT
+      yq -Y -i '.unclassified.gitHubPluginConfig.hookUrl = "http://${aws_instance.jenkins_instance.public_ip}:8080/github-webhook/"' ./lib/jenkins.yaml
+      yq -Y -i '.unclassified.location.url = "http://${aws_instance.jenkins_instance.public_ip}:8080/"' ./lib/jenkins.yaml
+      yq -Y -i '.unclassified.sonarGlobalConfiguration.installations[0].serverUrl = "http://${aws_instance.sonarqube_instance.public_ip}:9000"' ./lib/jenkins.yaml
+    EOT
   }
 
-provisioner "local-exec" {
-  command = <<EOT
-    yq -Y -i '.unclassified.gitHubPluginConfig.hookUrl = "http://${aws_instance.jenkins_instance.public_ip}:8080/github-webhook/"' ./lib/jenkins.yaml
-    yq -Y -i '.unclassified.location.url = "http://${aws_instance.jenkins_instance.public_ip}:8080/"' ./lib/jenkins.yaml
-    yq -Y -i '.unclassified.sonarGlobalConfiguration.installations[0].serverUrl = "http://${aws_instance.sonarqube_instance.public_ip}:9000"' ./lib/jenkins.yaml
-  EOT
-}
-
+  provisioner "local-exec" {
+    command = <<EOT
+      echo "[jenkins]" > inventory
+      echo "${aws_instance.jenkins_instance.public_ip}" >> inventory
+      echo "[sonarqube]" >> inventory
+      echo "${aws_instance.sonarqube_instance.public_ip}" >> inventory
+      ansible-playbook -i inventory --private-key ${local.private_key_path} -u ubuntu jenkins_sonarqube.yaml
+    EOT
+  }
 }
 
 resource "null_resource" "update_ansible_vars" {
   provisioner "local-exec" {
     command = <<EOT
-# Check if sonarqube_jdbc_url is present, then update or add
-if grep -q "sonarqube_jdbc_url:" ./vars/main.yaml; then
-  sed -i 's|^sonarqube_jdbc_url:.*|sonarqube_jdbc_url: jdbc:postgresql://${aws_db_instance.sonarqube_db.endpoint}/${aws_db_instance.sonarqube_db.db_name}|' ./vars/main.yaml
-else
-  echo "sonarqube_jdbc_url: jdbc:postgresql://${aws_db_instance.sonarqube_db.endpoint}/${aws_db_instance.sonarqube_db.db_name}" >> ./vars/main.yaml
-fi
+      # Check if sonarqube_jdbc_url is present, then update or add
+      if grep -q "sonarqube_jdbc_url:" ./vars/main.yaml; then
+        sed -i 's|^sonarqube_jdbc_url:.*|sonarqube_jdbc_url: jdbc:postgresql://${aws_db_instance.sonarqube_db.endpoint}/${aws_db_instance.sonarqube_db.db_name}|' ./vars/main.yaml
+      else
+        echo "sonarqube_jdbc_url: jdbc:postgresql://${aws_db_instance.sonarqube_db.endpoint}/${aws_db_instance.sonarqube_db.db_name}" >> ./vars/main.yaml
+      fi
 
-# Check if sonarqube_jdbc_username is present, then update or add
-if grep -q "sonarqube_jdbc_username:" ./vars/main.yaml; then
-  sed -i 's|^sonarqube_jdbc_username:.*|sonarqube_jdbc_username: ${var.db_username}|' ./vars/main.yaml
-else
-  echo "sonarqube_jdbc_username: ${var.db_username}" >> ./vars/main.yaml
-fi
+      # Check if sonarqube_jdbc_username is present, then update or add
+      if grep -q "sonarqube_jdbc_username:" ./vars/main.yaml; then
+        sed -i 's|^sonarqube_jdbc_username:.*|sonarqube_jdbc_username: ${var.db_username}|' ./vars/main.yaml
+      else
+        echo "sonarqube_jdbc_username: ${var.db_username}" >> ./vars/main.yaml
+      fi
 
-# Check if sonarqube_jdbc_password is present, then update or add
-if grep -q "sonarqube_jdbc_password:" ./vars/main.yaml; then
-  sed -i 's|^sonarqube_jdbc_password:.*|sonarqube_jdbc_password: ${var.db_password}|' ./vars/main.yaml
-else
-  echo "sonarqube_jdbc_password: ${var.db_password}" >> ./vars/main.yaml
-fi
-EOT
+      # Check if sonarqube_jdbc_password is present, then update or add
+      if grep -q "sonarqube_jdbc_password:" ./vars/main.yaml; then
+        sed -i 's|^sonarqube_jdbc_password:.*|sonarqube_jdbc_password: ${var.db_password}|' ./vars/main.yaml
+      else
+        echo "sonarqube_jdbc_password: ${var.db_password}" >> ./vars/main.yaml
+      fi
+
+      if grep -q "s3_bucket_name:" ./vars/main.yaml; then
+        sed -i 's|^s3_bucket_name:.*|s3_bucket_name: ${var.s3_bucket_name}|' ./vars/main.yaml
+      else
+        echo "s3_bucket_name: ${var.s3_bucket_name}" >> ./vars/main.yaml
+      fi
+      if grep -q "aws_access_key_id:" ./vars/main.yaml; then
+        sed -i 's|^aws_access_key_id:.*|aws_access_key_id: ${var.aws_access_key_id}|' ./vars/main.yaml
+      else
+        echo "aws_access_key_id: ${var.aws_access_key_id}" >> ./vars/main.yaml
+      fi
+      if grep -q "aws_secret_access_key:" ./vars/main.yaml; then
+        sed -i 's|^aws_secret_access_key:.*|aws_secret_access_key: ${var.aws_secret_access_key}|' ./vars/main.yaml
+      else
+        echo "aws_secret_access_key: ${var.aws_secret_access_key}" >> ./vars/main.yaml
+      fi
+    EOT
   }
 
   depends_on = [aws_db_instance.sonarqube_db]
-}
-
-resource "null_resource" "write_inventory" {
-  depends_on = [aws_instance.jenkins_instance, aws_instance.sonarqube_instance]
-
-  provisioner "local-exec" {
-    command = "bash ./write_inventory.sh && ansible-playbook -i inventory --private-key ${local.private_key_path} -u ubuntu jenkins_sonarqube.yaml"
-  }
 }
