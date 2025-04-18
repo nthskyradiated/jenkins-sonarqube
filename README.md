@@ -1,9 +1,10 @@
 # Jenkins and SonarQube Deployment
 
 This repo provides two variants for deploying Jenkins and SonarQube:
-1. Using Docker Compose
-2. Using AWS EC2 instances with Terraform and Ansible
-3. @TODO Via a Kubernetes deployment
+1. Using Docker Compose.
+2. Using AWS EC2 instances with Terraform and Ansible.
+3. Via Kubernetes as deployments.
+4. @TODO as Helm deployment using Terraform.
 
 ## Docker Compose Deployment
 

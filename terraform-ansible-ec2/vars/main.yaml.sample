@@ -1,0 +1,8 @@
+# the vars/main.yaml file will be created by terraform like below
+
+sonarqube_jdbc_url: jdbc:postgresql://your-aws-sql-address:5432/sonarqube
+sonarqube_jdbc_username: your-sonarqube-jdbc-username
+sonarqube_jdbc_password: your-sonarqube-jdbc-password
+s3_bucket_name: your-s3-bucket-name
+aws_access_key_id: your-aws-access-key-id
+aws_secret_access_key: your-aws-secret-access-key

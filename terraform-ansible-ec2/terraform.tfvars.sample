@@ -1,0 +1,11 @@
+instance_count          = 2
+public_key              = "your-ssh-public-key"
+s3_bucket_name          = "your-s3-bucket-name"
+jenkins_instance_type   = "t2.medium"
+sonarqube_instance_type = "t2.medium"
+db_username             = "your-sonarqube-jdbc-username"
+db_password             = "your-sonarqube-jdbc-password"
+db_name                 = "sonarqube"
+rds_instance_type       = "db.t4g.micro"
+aws_access_key_id       = "your-aws-access-key-id"
+aws_secret_access_key   = "your-aws-secret-access-key"
