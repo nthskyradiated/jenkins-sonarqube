@@ -1,8 +1,12 @@
 # Deploying Jenkins and Sonarqube on a Kubernetes Cluster
 
-I'm currently running my Kubernetes cluster as a bare-metal deployment with NFS shares (in the first control plane) as persistent volumes for the cluster.
+I'm currently running my Kubernetes cluster as a bare-metal deployment with local path provisioner from Rancher for persistent storage.
 
-Follow the steps below:
+```bash
+kubectl apply -f https://raw.githubusercontent.com/rancher/local-path-provisioner/master/deploy/local-path-storage.yaml
+```
+
+if you want to use local NFS shares (in the first control plane VM perhaps?) as persistent volumes for the cluster, follow the steps below:
 * on controlplane / nfs server
 
   - `sudo apt install nfs-kernel-server`
