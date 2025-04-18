@@ -39,6 +39,7 @@ terraform.rc
 .terraform.lock.hcl
 local
 local/*
+.vscode
 .vscode/*
 terraform-ansible-ec2/vars/main.yaml
 .env

@@ -18,8 +18,8 @@ This approach uses Docker Compose to deploy Jenkins, SonarQube, and a PostgreSQL
 
 1. Clone the repository:
     ```sh
-    git clone https://github.com/your-repo/jenkins-sonarqube.git
-    cd jenkins-sonarqube
+    git clone https://github.com/nthskyradiated/jenkins-sonarqube.git
+    cd jenkins-sonarqube/docker-compose
     ```
 
 2. Start the services:
