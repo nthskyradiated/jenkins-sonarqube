@@ -46,4 +46,3 @@ terraform-ansible-ec2/vars/main.yaml
 
 # Ignore specific yaml files
 **/lib/jenkins.yaml
-lib/jenkins.yaml
