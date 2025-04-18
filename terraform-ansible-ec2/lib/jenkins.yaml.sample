@@ -1,0 +1,176 @@
+credentials:
+  system:
+    domainCredentials:
+    - credentials:
+      - basicSSHUserPrivateKey:
+          description: "my github username"
+          id: "github"
+          privateKeySource:
+            directEntry:
+              privateKey: "{*** redacted ***}"
+          scope: GLOBAL
+          username: "nthskyradiated"
+      - usernamePassword:
+          description: "my docker id"
+          id: "myDockerID"
+          password: "{*** redacted ***}"
+          scope: GLOBAL
+          username: "nthskyradiated"
+      - basicSSHUserPrivateKey:
+          description: "local jenkins agent"
+          id: "jenkins-local-agent"
+          privateKeySource:
+            directEntry:
+              privateKey: "{*** your jenkins agent private key if you have any ***}"
+          scope: GLOBAL
+          username: "jenkins"
+      - usernamePassword:
+          description: "jenkins PAT for github"
+          id: "jenkins-argo-gh"
+          password: "{*** redacted ***}"
+          scope: GLOBAL
+          username: "nthskyradiated"
+          usernameSecret: true
+      - basicSSHUserPrivateKey:
+          description: "ubuntu user for jenkins ec2"
+          id: "jenkins-ec2-ubuntu-user"
+          privateKeySource:
+            directEntry:
+              privateKey: "{*** redacted ***}"
+          scope: GLOBAL
+          username: "ubuntu"
+      - usernamePassword:
+          description: "pf-api-go-gh"
+          id: "pf-api-go-gh"
+          password: "{*** redacted ***}"
+          scope: GLOBAL
+          username: "nthskyradiated"
+      - string:
+          description: "sonarqube-id"
+          id: "sonarqube-id"
+          scope: GLOBAL
+          secret: "{*** redacted ***}"
+jenkins:
+  disableRememberMe: false
+  disabledAdministrativeMonitors:
+  - "hudson.util.DoubleLaunchChecker"
+  - "jenkins.diagnostics.ControllerExecutorsAgents"
+  globalNodeProperties:
+  - envVars:
+      env:
+      - key: "API_DIR_PATH"
+        value: "/api/routes"
+      - key: "APP_PORT"
+        value: ":3000"
+      - key: "ENV"
+        value: "prod"
+      - key: "GIT_USER_EMAIL"
+        value: "your git user email"
+      - key: "GIT_USER_NAME"
+        value: "\"your name\""
+      - key: "GIT_USERNAME"
+        value: "nthskyradiated"
+      - key: "GITHUB_REPO_NAME"
+        value: "express-ts-api"
+      - key: "MONGO_URI"
+        value: "*** redacted ***"
+      - key: "MONGODB_URI"
+        value: "*** redacted ***"
+      - key: "NODE_ENV"
+        value: "dev"
+      - key: "PORT"
+        value: "8080"
+      - key: "REPO_NAME"
+        value: "pf-api-go"
+  securityRealm:
+    local:
+      allowsSignup: false
+      enableCaptcha: false
+      users:
+      - id: "admin"
+        name: "admin"
+        properties:
+        - "consoleUrlProvider"
+        - "myView"
+        - preferredProvider:
+            providerId: "default"
+        - theme:
+            theme: "noOp"
+        - "timezone"
+        - "experimentalFlags"
+        - mailer:
+            emailAddress: "your email address"
+        - "apiToken"
+unclassified:
+  pipeline-model-docker:
+    registry:
+      credentialsId: "myDockerID"
+      url: "https://index.docker.io/v1/"
+  scmGit:
+    addGitTagAction: false
+    allowSecondFetch: false
+    createAccountBasedOnEmail: false
+    disableGitToolChooser: false
+    globalConfigEmail: "your email address"
+    globalConfigName: "your name"
+    hideCredentials: false
+    showEntireCommitSummaryInChanges: false
+    useExistingAccountWithSameEmail: false
+  sonarGlobalConfiguration:
+    buildWrapperEnabled: true
+    installations:
+    - credentialsId: "sonarqube-id"
+      name: "sonarqube-install"
+      serverUrl: "http://sonarqube:9000"
+      triggers:
+        skipScmCause: false
+        skipUpstreamCause: false
+  sonarQualityGates:
+    sonarInstances:
+    - maxWaitTime: 0
+      name: "sonarqube-quality-gate"
+      timeToWait: 0
+      url: "http://localhost:9000"
+tool:
+  dockerTool:
+    installations:
+    - name: "DockerInstall"
+      properties:
+      - installSource:
+          installers:
+          - fromDocker:
+              version: "latest"
+  git:
+    installations:
+    - home: "git"
+      name: "Default"
+  go:
+    installations:
+    - name: "Go"
+      properties:
+      - installSource:
+          installers:
+          - golangInstaller:
+              id: "1.23.5"
+  mavenGlobalConfig:
+    globalSettingsProvider: "standard"
+    settingsProvider: "standard"
+  nodejs:
+    installations:
+    - name: "NodeJS"
+      properties:
+      - installSource:
+          installers:
+          - nodeJSInstaller:
+              id: "23.7.0"
+              npmPackagesRefreshHours: 72
+          - zip:
+              url: "https://nodejs.org/dist/v23.7.0/node-v23.7.0-linux-x64.tar.xz"
+  sonarRunnerInstallation:
+    installations:
+    - name: "SonarQube"
+      properties:
+      - installSource:
+          installers:
+          - sonarRunnerInstaller:
+              id: "7.0.0.4796"

@@ -43,4 +43,4 @@ local/*
 .vscode/*
 terraform-ansible-ec2/vars/main.yaml
 .env
-lib
+lib/jenkins.yaml
